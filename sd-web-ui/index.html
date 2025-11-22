@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion Web UI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Connection Panel -->
+        <div class="connection-panel" id="connectionPanel">
+            <div class="panel-title">
+                <i class="fas fa-plug"></i> Connection Settings
+            </div>
+            <div class="panel-content">
+                <div class="form-group">
+                    <label for="endpoint">WebSocket Endpoint</label>
+                    <input 
+                        type="text" 
+                        id="endpoint" 
+                        placeholder="wss://[random].trycloudflare.com" 
+                        class="form-input"
+                        value="">
+                    <small class="form-hint">Enter the Cloudflare tunnel URL from your Colab notebook</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        placeholder="Enter server password" 
+                        class="form-input"
+                        value="">
+                </div>
+
+                <button id="connectBtn" class="btn btn-primary btn-connect">
+                    <i class="fas fa-link"></i> Connect
+                </button>
+
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span class="status-text" id="statusText">Disconnected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Generation Panel -->
+        <div class="main-panel" id="mainPanel" style="display: none;">
+            <div class="panel-header">
+                <h1>Stable Diffusion Image Generator</h1>
+                <div class="connection-badge">
+                    <span class="badge-indicator"></span>
+                    Connected
+                </div>
+            </div>
+
+            <div class="content-wrapper">
+                <!-- Left Column: Input Controls -->
+                <div class="control-column">
+                    <!-- Image Upload Section -->
+                    <section class="control-section">
+                        <h3>Base Image (Optional)</h3>
+                        <div class="upload-area" id="uploadArea">
+                            <input 
+                                type="file" 
+                                id="imageInput" 
+                                accept="image/*" 
+                                style="display: none;">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drag & drop an image here or click to select</p>
+                            <small>PNG, JPG, WebP (max 10MB)</small>
+                        </div>
+                        <div id="uploadedImage" class="uploaded-image-preview" style="display: none;">
+                            <img id="previewImage" alt="Preview">
+                            <button id="removeImageBtn" class="btn-icon-small" title="Remove image">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Prompt Section -->
+                    <section class="control-section">
+                        <h3>Prompt</h3>
+                        <textarea 
+                            id="prompt" 
+                            class="form-textarea" 
+                            placeholder="Describe what you want to generate..."></textarea>
+                    </section>
+
+                    <!-- Negative Prompt Section -->
+                    <section class="control-section">
+                        <h3>Negative Prompt</h3>
+                        <textarea 
+                            id="negativePrompt" 
+                            class="form-textarea" 
+                            placeholder="What to avoid..."></textarea>
+                    </section>
+
+                    <!-- Model & Sampler -->
+                    <section class="control-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="model">Model</label>
+                                <select id="model" class="form-select">
+                                    <option value="">Loading models...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sampler">Sampler</label>
+                                <select id="sampler" class="form-select">
+                                    <option value="DPM++ 2M Karras">DPM++ 2M Karras</option>
+                                    <option value="DPM++ 2M">DPM++ 2M</option>
+                                    <option value="Euler">Euler</option>
+                                    <option value="Euler a">Euler a</option>
+                                    <option value="Heun">Heun</option>
+                                    <option value="LMS">LMS</option>
+                                    <option value="LMS Karras">LMS Karras</option>
+                                </select>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Basic Settings -->
+                    <section class="control-section">
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <label>Steps</label>
+                                <span class="slider-value" id="stepsValue">20</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                id="steps" 
+                                min="1" 
+                                max="150" 
+                                value="20" 
+                                class="slider">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <label>CFG Scale</label>
+                                <span class="slider-value" id="cfgValue">7.5</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                id="cfg" 
+                                min="1" 
+                                max="30" 
+                                step="0.5" 
+                                value="7.5" 
+                                class="slider">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <label>Denoising Strength</label>
+                                <span class="slider-value" id="denoisingValue">0.75</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                id="denoising" 
+                                min="0" 
+                                max="1" 
+                                step="0.05" 
+                                value="0.75" 
+                                class="slider">
+                            <small class="slider-hint">Only for img2img (when base image is provided)</small>
+                        </div>
+                    </section>
+
+                    <!-- Dimension Settings -->
+                    <section class="control-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="width">Width</label>
+                                <select id="width" class="form-select">
+                                    <option value="512">512</option>
+                                    <option value="576">576</option>
+                                    <option value="640">640</option>
+                                    <option value="704">704</option>
+                                    <option value="768">768</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="height">Height</label>
+                                <select id="height" class="form-select">
+                                    <option value="512">512</option>
+                                    <option value="576">576</option>
+                                    <option value="640">640</option>
+                                    <option value="704">704</option>
+                                    <option value="768">768</option>
+                                </select>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Seed -->
+                    <section class="control-section">
+                        <div class="form-row">
+                            <div class="form-group flex-grow">
+                                <label for="seed">Seed</label>
+                                <input 
+                                    type="text" 
+                                    id="seed" 
+                                    class="form-input" 
+                                    placeholder="Leave empty for random">
+                            </div>
+                            <button id="randomSeedBtn" class="btn btn-secondary" style="margin-top: 20px;">
+                                <i class="fas fa-dice"></i> Random
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column: Preview & Results -->
+                <div class="preview-column">
+                    <!-- Generation Status -->
+                    <div class="status-section" id="statusSection">
+                        <div class="progress-container" style="display: none;" id="progressContainer">
+                            <div class="progress-bar" id="progressBar"></div>
+                            <div class="progress-text" id="progressText">Initializing...</div>
+                        </div>
+
+                        <div class="generation-buttons" id="generationButtons">
+                            <button id="generateBtn" class="btn btn-success btn-lg">
+                                <i class="fas fa-wand-magic-sparkles"></i> Generate
+                            </button>
+                            <button id="stopBtn" class="btn btn-danger btn-lg" style="display: none;">
+                                <i class="fas fa-stop-circle"></i> Stop
+                            </button>
+                        </div>
+
+                        <div class="error-message" id="errorMessage" style="display: none;"></div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div class="results-section" id="resultsSection" style="display: none;">
+                        <h3>Generated Image</h3>
+                        <div class="result-image-container">
+                            <img id="resultImage" alt="Generated image">
+                        </div>
+
+                        <div class="result-actions">
+                            <button id="downloadBtn" class="btn btn-primary">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button id="useAsInputBtn" class="btn btn-primary">
+                                <i class="fas fa-arrow-right"></i> Use as Input
+                            </button>
+                            <button id="shareBtn" class="btn btn-primary">
+                                <i class="fas fa-share-alt"></i> Share
+                            </button>
+                        </div>
+
+                        <div class="metadata-section" id="metadataSection" style="display: none;">
+                            <h4>Generation Details</h4>
+                            <div class="metadata-content" id="metadataContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-image"></i>
+                        <p>Generated images will appear here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="spinner"></div>
+        <p id="loadingText">Connecting...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="websocket.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

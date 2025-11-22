@@ -1,0 +1,28 @@
+{
+  "name": "stable-diffusion-web-ui",
+  "version": "1.0.0",
+  "description": "Web-based UI for Stable Diffusion image generation with WebSocket backend",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "dev": "npx http-server -p 8000",
+    "build": "echo 'No build step required for static site'",
+    "deploy": "git push origin main"
+  },
+  "keywords": [
+    "stable-diffusion",
+    "image-generation",
+    "websocket",
+    "ai",
+    "deep-learning"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/sd-web-ui.git"
+  }
+}

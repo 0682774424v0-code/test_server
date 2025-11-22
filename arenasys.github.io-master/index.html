@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="assets/css/photoswipe.css">
+    <link rel="stylesheet" href="assets/css/highlight-within-textarea.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <script src="assets/js/jquery-3.2.1.slim.min.js"></script>
+    <script src="assets/js/popper.min.js"></script>
+    <script src="assets/js/bootstrap.min.js"></script>
+    <script src="assets/js/highlight-within-textarea.js"></script>
+
+    <title>qDiffusion Web</title>
+  </head>
+  <body>
+
+    <div class="modal" id="error-modal" tabindex="-1" role="dialog" aria-labelledby="error-model-title" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h6 class="modal-title" id="error-model-title">Error</h5>
+          </div>
+          <div class="modal-body" id="error-label">
+            ...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="add-modal" tabindex="-1" role="dialog" aria-labelledby="add-model-title" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h6 class="modal-title" id="add-model-title">Add to Prompt</h5>
+          </div>
+          <div class="modal-body add-body" id="add-label">
+            <div class="input-group input-group-sm">
+              <div class="input-group-prepend prompt-tab-row">
+                <span class="input-group-text custom-tab" id="lora-button" onclick="switchModel(true);">LoRAs</span>
+                <span style="width:3px"></span>
+                <span class="input-group-text custom-tab disabled" id="embedding-button" onclick="switchModel(false);">Embeddings</span>
+                <span style="width:100%"></span>
+              </div>
+              <div class="modal-list-holder">
+                <table class="table table-striped modal-list">
+                  <tbody id="lora-table" class="modal-table">
+                    <tr>
+                      <td><span>None</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <table class="table table-striped modal-list hidden">
+                  <tbody id="embedding-table" class="modal-table">
+                    <tr>
+                      <td><span>None</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="base-container">
+      <div class="outputs">
+        <div class="mid structure">
+          <div class="mid-lower structure">
+            <div class="button-holder">
+              <button type="button" class="btn btn-gen" id="generate" disabled>
+                Generate
+              </button>
+              <button type="button" class="btn btn-gen btn-forever" id="forever">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                  <path d="m17 16.7h-10v-2.7l-4 4 4 4v-2.7h12.6v-6.3h-2.6m-10-5.7h10v2.7l4-4-4-4v2.7h-12.6v6.3h2.6z" fill="currentColor"/>
+                </svg>
+              </button>
+            </div>
+            <div class="image-holder" id="gallery">
+              <svg class="placeholder" version="1.1" width="64" height="64" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" fill="currentColor" >
+                <path d="m239.97 128a15.79 15.79 0 0 1-10.5 15l-63.44 23.07-23.06 63.43a16 16 0 0 1-30 0l-23.07-63.5-63.43-23a16 16 0 0 1 0-30l63.5-23.07 23-63.43a16 16 0 0 1 30 0l23.07 63.5 63.43 23a15.79 15.79 0 0 1 10.5 15z"/>
+              </svg>
+              <img class="image" id="result" src="">
+            </div>
+            <div class="status-bar status-error" id="status-bar">
+              <div class="progress status-progress">
+                <div class="progress-bar" id="status-progress" role="progressbar" style="width: 0%;"></div>
+              </div>
+              <div class="status-text" id="status-text">Disconnected</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="parameters">
+        <div class="column structure">
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend prompt-tab-row">
+              <span class="input-group-text custom-tab" id="prompt-button" onclick="switchPrompt(true);">Prompt</span>
+              <span style="width:3px"></span>
+              <span class="input-group-text custom-tab disabled" id="negative-prompt-button" onclick="switchPrompt(false);">Negative</span>
+              <span style="width:100%"></span>
+              <span class="input-group-text custom-tab" id="add-button" onclick="">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="1 1 14 14">
+                  <path d="m14 6.7h-4.7v-4.7h-2.6v4.7h-4.7v2.6h4.7v4.7h2.6v-4.7h4.7z" fill="currentColor"/>
+                </svg>
+              </span>
+            </div>
+            <textarea class="prompt" placeholder="Prompt..." id="prompt" spellcheck="false"></textarea>
+            <textarea class="prompt" placeholder="Negative Prompt..." id="negative-prompt" spellcheck="false"></textarea>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Model</span>
+            </div>
+            <select class="custom-select" id="model">
+              <option selected>None</option>
+            </select>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Width</span>
+            </div>
+            <div class="form-control">
+              <input class="form-control custom-range" id="width" oninput="syncLabels();" type="range" value="512" min="512" max="2048" step="128">
+            </div>
+            <div class="input-group-append">
+              <span class="input-group-text text-fixed" id="width-label">512</span>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Height</span>
+            </div>
+            <div class="form-control">
+              <input class="form-control custom-range" id="height" oninput="syncLabels();" type="range" value="512" min="512" max="2048" step="128">
+            </div>
+            <div class="input-group-append">
+              <span class="input-group-text text-fixed" id="height-label">512</span>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Steps</span>
+            </div>
+            <div class="form-control">
+              <input class="form-control custom-range" id="steps" oninput="syncLabels();" type="range" value="25" min="10" max="100">
+            </div>
+            <div class="input-group-append">
+              <span class="input-group-text text-fixed" id="steps-label">25</span>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Scale</span>
+            </div>
+            <div class="form-control">
+              <input class="form-control custom-range" id="scale" oninput="syncLabels();" type="range" value="7" min="1" max="20">
+            </div>
+            <div class="input-group-append">
+              <span class="input-group-text text-fixed" id="scale-label">7</span>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Seed</span>
+            </div>
+            <input type="number" class="form-control custom-input" id="seed" value="" placeholder="Random">
+            <div class="input-group-append">
+              <button type="button" class="btn btn-outline-secondary inline-button" id="randomize" onclick="randomizeSeed();">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-dice-3-fill" viewBox="-1 -1 18 18">
+                  <path d="M3 0a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V3a3 3 0 0 0-3-3H3zm2.5 4a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm8 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM8 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend">
+              <span class="input-group-text">Sampler</span>
+            </div>
+            <select class="custom-select" id="sampler">
+              <option selected>Euler a</option>
+              <option>DDIM</option>
+              <option>DPM++ 2M Karras</option>
+              <option>DPM++ SDE Karras</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="column structure additional">
+          <div class="input-group input-group-sm mb-2">
+            <div class="input-group-prepend prompt-tab-row">
+              <span class="input-group-text custom-tab" id="endpoint-button" onclick="switchSettings('endpoint');">Endpoint</span>
+              <span style="width:3px"></span>
+              <span class="input-group-text custom-tab disabled" id="highres-button" onclick="switchSettings('highres');">Highres</span>
+              <span style="width:3px"></span>
+              <span class="input-group-text custom-tab disabled" id="operation-button" onclick="switchSettings('operation');">Operation</span>
+              <span style="width:100%"></span>
+            </div>
+            <div class="settings-container">
+              <div id="endpoint-column" class="">
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Endpoint</span>
+                  </div>
+                  <input type="text" class="form-control custom-input" id="endpoint" placeholder="wss://endpoint.here">
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Password</span>
+                  </div>
+                  <input type="text" class="form-control custom-input" id="password" placeholder="None">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary inline-button" id="connect">
+                      <svg id="icon-disconnected" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 26 26"><path fill="currentColor" d="M24.875 0a1 1 0 0 0-.594.281l-1.656 1.656c-2.204-1.59-5.261-1.305-7.313.657c0 .076-.855.91-1.624 1.656l-.97-.969a1 1 0 0 0-.812-.312a1 1 0 0 0-.125.031a1 1 0 0 0-.5 1.719L13.562 7l-3.28 3.281a1.016 1.016 0 1 0 1.437 1.438L15 8.438L17.563 11l-3.282 3.281a1.016 1.016 0 1 0 1.438 1.438L19 12.438l2.281 2.28a1.016 1.016 0 1 0 1.438-1.437l-.969-.969l1.656-1.624c1.96-1.96 2.159-5.008.625-7.282L25.72 1.72A1 1 0 0 0 24.875 0zM3.906 10.969a1 1 0 0 0-.125.031a1 1 0 0 0-.5 1.719l.969.969l-1.656 1.624c-1.96 1.96-2.159 5.008-.625 7.282L.28 24.28a1.016 1.016 0 1 0 1.44 1.44l1.656-1.657c2.204 1.592 5.261 1.306 7.313-.656c0-.076.855-.91 1.624-1.656l.97.969a1.016 1.016 0 1 0 1.437-1.438l-10-10a1 1 0 0 0-.813-.312z"/></svg>
+                      <svg id="icon-connected" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 26 26"><path fill="currentColor" d="M24.875 0a1 1 0 0 0-.594.281l-4.656 4.657c-2.204-1.592-5.261-1.306-7.313.656c0 .076-.855.91-1.624 1.656l-.97-.969A1 1 0 0 0 8.782 6a1 1 0 0 0-.5 1.719l10 10a1.016 1.016 0 1 0 1.438-1.438l-.969-.968l1.656-1.626c1.96-1.96 2.159-5.007.625-7.28l4.688-4.688A1 1 0 0 0 24.875 0zM6.906 7.969A1 1 0 0 0 6.781 8a1 1 0 0 0-.5 1.719l.969.969l-1.656 1.624c-1.96 1.96-2.159 5.008-.625 7.282L.28 24.28a1.016 1.016 0 1 0 1.44 1.44l4.656-4.657c2.204 1.592 5.261 1.306 7.313-.656c0-.076.855-.91 1.624-1.656l.97.969a1.016 1.016 0 1 0 1.437-1.438l-10-10a1 1 0 0 0-.813-.312z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend input-group-normal">
+                    <select class="custom-select input-group-normal" id="download-type">
+                      <option selected>Checkpoint</option>
+                      <option>LoRA</option>
+                      <option>Embedding</option>
+                      <option>Upscaler</option>
+                    </select>
+                  </div>
+                  <input type="text" class="form-control custom-input" id="download-url" placeholder="https://model.url">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary inline-button" id="download">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="2 2 20 20"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7l7-7zM5 18v2h14v-2H5z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div id="download-holder" class="download-list-holder">
+                  <table class="table table-striped modal-list">
+                    <tbody id="download-table" class="modal-table">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="highres-column" class="hidden">
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Factor</span>
+                  </div>
+                  <div class="form-control">
+                    <input class="form-control custom-range" id="highres" oninput="syncLabels();" type="range" value="1" min="1" max="2" step="0.05">
+                  </div>
+                  <div class="input-group-append">
+                    <span class="input-group-text text-fixed-wide" id="highres-label">1.00</span>
+                  </div>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Strength</span>
+                  </div>
+                  <div class="form-control">
+                    <input class="form-control custom-range" id="strength" oninput="syncLabels();" type="range" value="0.7" min="0" max="1" step="0.05">
+                  </div>
+                  <div class="input-group-append">
+                    <span class="input-group-text text-fixed-wide" id="strength-label">0.70</span>
+                  </div>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Upscaler</span>
+                  </div>
+                  <select class="custom-select" id="upscaler">
+                    <option selected>Lanczos</option>
+                  </select>
+                </div>
+
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend input-group-center">
+                    <span class="input-group-text" id="final-resolution">512x512</span>
+                  </div>
+                </div>
+              </div>
+
+              <div id="operation-column" class="hidden">
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">CLIP Skip</span>
+                  </div>
+                  <div class="form-control">
+                    <input class="form-control custom-range" id="clip-skip" oninput="syncLabels();" type="range" value="1" min="1" max="3">
+                  </div>
+                  <div class="input-group-append">
+                    <span class="input-group-text text-fixed" id="clip-skip-label">1</span>
+                  </div>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Network Mode</span>
+                  </div>
+                  <select class="custom-select" id="network-mode">
+                    <option selected>Dynamic</option>
+                    <option>Static</option>
+                  </select>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Prediction</span>
+                  </div>
+                  <select class="custom-select" id="prediction">
+                    <option selected>Default</option>
+                    <option>Epsilon</option>
+                    <option>V</option>
+                  </select>
+                </div>
+                <div class="input-group input-group-sm mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">CFG Rescale</span>
+                  </div>
+                  <div class="form-control">
+                    <input class="form-control custom-range" id="cfg-rescale" oninput="syncLabels();" type="range" value="0.0" min="0" max="1" step="0.05">
+                  </div>
+                  <div class="input-group-append">
+                    <span class="input-group-text text-fixed-wide" id="cfg-rescale-label">0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script>
+
+    function switchPrompt(value) {
+      if(value) {
+        $("#prompt-button").removeClass("disabled");
+        $("#negative-prompt-button").addClass("disabled");
+        $("#prompt").parent().removeClass("hidden");
+        $("#negative-prompt").parent().addClass("hidden");
+      } else {
+        $("#prompt-button").addClass("disabled");
+        $("#negative-prompt-button").removeClass("disabled");
+        $("#prompt").parent().addClass("hidden");
+        $("#negative-prompt").parent().removeClass("hidden");
+      }
+    }
+
+    function switchModel(value) {
+      if(value) {
+        $("#lora-table").parent().removeClass("hidden");
+        $("#embedding-table").parent().addClass("hidden");
+        $("#lora-button").removeClass("disabled");
+        $("#embedding-button").addClass("disabled");
+      } else {
+        $("#lora-table").parent().addClass("hidden");
+        $("#embedding-table").parent().removeClass("hidden");
+        $("#lora-button").addClass("disabled");
+        $("#embedding-button").removeClass("disabled");
+      }
+    }
+
+    function switchSettings(value) {
+      $("#endpoint-button").addClass("disabled");
+      $("#highres-button").addClass("disabled");
+      $("#operation-button").addClass("disabled");
+      $("#" + value + "-button").removeClass("disabled");
+
+      $("#endpoint-column").addClass("hidden");
+      $("#highres-column").addClass("hidden");
+      $("#operation-column").addClass("hidden");
+      $("#" + value + "-column").removeClass("hidden");
+    }
+
+    function setProgress(elem, progress) {
+      if(progress == -1) {
+        elem.children("svg").eq(0).addClass("hidden")
+        elem.children("svg").eq(1).addClass("hidden")
+        elem.children("svg").eq(2).removeClass("hidden")
+        return;
+      }
+      if(progress == 1) {
+        elem.children("svg").eq(0).addClass("hidden")
+        elem.children("svg").eq(1).removeClass("hidden")
+        elem.children("svg").eq(2).addClass("hidden")
+        return
+      }
+      const t = 251.2
+      var v = t * progress;
+      elem.children("svg").eq(0).children("path").eq(1).attr("stroke-dasharray", v+","+(t-v));
+    }
+
+    function syncLabels() {
+      $("#steps-label").text($("#steps").val())
+      $("#scale-label").text($("#scale").val())
+      $("#width-label").text($("#width").val())
+      $("#height-label").text($("#height").val())
+      $("#highres-label").text(parseFloat($("#highres").val()).toFixed(2))
+      $("#strength-label").text(parseFloat($("#strength").val()).toFixed(2))
+      $("#clip-skip-label").text($("#clip-skip").val())
+      $("#cfg-rescale-label").text(parseFloat($("#cfg-rescale").val()).toFixed(2))
+
+      var factor = parseFloat($("#highres").val());
+      var width = Math.floor(parseInt($("#width").val()) * factor);
+      var height = Math.floor(parseInt($("#height").val()) * factor);
+
+      $("#final-resolution").text(width+"x"+height);
+    }
+
+    function randomizeSeed() {
+      $("#seed").val("");
+    }
+
+    function getPrompt() {
+      if($("#prompt-button").hasClass("disabled")) {
+        return $("#negative-prompt");
+      } else {
+        return $("#prompt");
+      }
+    }
+
+    function promptAdd(value) {
+      var p = getPrompt();
+      var txt = p.val().trim();
+      if(txt) {
+        p.val(txt + ", " + value);
+      } else {
+        p.val(value);
+      }
+      p.highlightWithinTextarea("update");
+    }
+
+    function promptRemove(value) {
+      var p = getPrompt();
+      var txt = p.val().trim();
+      p.val(txt.replace(value, ""));
+      p.highlightWithinTextarea("update");
+    }
+
+  </script>
+  <script type="module">
+    import PhotoSwipe from './assets/js/photoswipe.esm.min.js';
+    import { getKey, encrypt, decrypt } from './assets/js/scheme.mjs';
+
+    var ws
+    var key
+
+    var models = {}
+    var loras = []
+    var embeddings = []
+    var upscalers = {}
+    var selected
+
+    var results = []
+    var gallery
+
+    var working = false
+    var preview = false
+    var forever = false
+    var waiting = false
+    var id
+
+    var downloads = {}
+
+    function switchConnected(value) {
+      if(value) {
+        $("#icon-connected").removeClass("hidden");
+        $("#icon-disconnected").addClass("hidden");
+        $("#generate").prop("disabled", false);
+        setStatusProgress(0);
+        setStatusMode("idle");
+        setStatusMessage("Connected");
+      } else {
+        $("#icon-connected").addClass("hidden");
+        $("#icon-disconnected").removeClass("hidden");
+        $("#generate").prop("disabled", true);
+        setModels(["None"])
+        setStatusProgress(0);
+        setStatusMode("error")
+        setStatusMessage("Disconnected")
+      }
+    }
+
+    function switchWorking(value) {
+      working = value
+
+      if(!working && preview) {
+        if(results.length != 0) {
+          $("#result").attr("src", results[0].src)
+        } else {
+          $("#result").attr("src", "")
+        }
+      }
+
+      if(working) {
+        $("#generate").html("Working");
+      } else {
+        $("#generate").html("Generate");
+      }
+    }
+
+    function glow(id, type) {
+      $(id).addClass(type);
+      setTimeout(function() {
+        $(id).removeClass(type);
+      },1000);
+    }
+
+    async function setModels(models) {
+      var current = $("#model option:selected").text()
+      $('#model option').remove();
+      $.each(models, function(val, text) {
+        var entry = $('<option></option>').val(val).html(text)
+        if(text == current) {
+          entry.prop('selected', true);
+        }
+        $("#model").append(entry);
+      });
+    }
+
+    async function setUpscalers(models) {
+      var current = $("#upscaler option:selected").text()
+      $('#upscaler option').remove();
+      $.each(models, function(val, text) {
+        var entry = $('<option></option>').val(val).html(text)
+        if(text == current) {
+          entry.prop('selected', true);
+        }
+        $("#upscaler").append(entry);
+      });
+    }
+
+    function setStatusMessage(message) {
+      $("#status-text").text(message);
+    }
+
+    function setStatusMode(mode) {
+      $("#status-bar").removeClass("status-error");
+      $("#status-bar").removeClass("status-idle");
+      $("#status-bar").removeClass("status-working");
+      $("#status-bar").removeClass("status-empty");
+      $("#status-bar").removeClass("status-waiting");
+      $("#status-bar").addClass("status-"+mode);
+    }
+
+    function setStatusProgress(progress) {
+      setStatusMode("empty")
+      $("#status-progress").css("width", progress + "%");
+    }
+
+
+    function showError(title, error) {
+      $("#error-label").html(error);
+      $("#error-model-title").html(title);
+      $("#error-modal").modal("show");
+    }
+
+    function showAdd() {
+      $("#add-modal").modal("show");
+    }
+
+    function setErrorMessage(message) {
+      var stage = $("#status-text").text()
+      setStatusProgress(0);
+      setStatusMode("error")
+      setStatusMessage("Errored")
+      showError("Error while " + stage, message)
+    }
+
+    async function sendMessage(msg) {
+      if(!msg.id) {
+        msg.id = Math.floor(Math.random() * 1000000) + 1
+      }
+      ws.send(await encrypt(key, msg));
+    }
+    
+    async function handleMessage(msg) {
+      const type = msg.type;
+      const data = msg.data;
+
+      switch(type) {
+        case "hello":
+          sendMessage({"type":"options"})
+          break;
+        case "ack":
+          if(data.queue > 0 && (data.id == id || models)) {
+            setStatusMode("waiting")
+            setStatusMessage("Waiting");
+            waiting = true;
+          }
+          break;
+        case "options":
+          if(waiting) {
+            switchConnected(true);
+          }
+          handleOptions(data)
+          break;
+        case "result":
+          handleResult(data.images[0].buffer);
+          preview = false;
+          switchWorking(false);
+          switchConnected(true);
+          if(forever) {
+            await doGenerate()
+          }
+          break;
+        case "progress":
+          setStatusProgress(Math.floor(100*(data.current+1)/data.total))
+          if(data.previews) {
+            preview = true;
+            setResult(data.previews[0].buffer);
+          }
+          break;
+        case "status":
+          setStatusMode("working")
+          setStatusMessage(data.message);
+          break;
+        case "error":
+          setErrorMessage(data.message);
+          break;
+        case "aborted":
+          switchWorking(false);
+          switchConnected(true);
+          break;
+        case "download":
+          await handleDownload(data, msg.id);
+          break;
+        default:
+          console.log(msg)
+      }
+    }
+
+    function getName(file) {
+      var name = file.split("/").slice(-1)[0].split("\\").slice(-1)[0].split('.').slice(0, -1).join('.');
+      return name;
+    }
+
+    async function handleOptions(data) {
+      models = {}
+      $.map(data.UNET, function(entry) {
+        var name = getName(entry);
+        models[name] = entry;
+      })
+      await setModels(Object.keys(models));
+
+      loras = []
+      var lora_tbl = $("#lora-table").empty()
+      $.map(data.LoRA, function(entry) {
+        var name = getName(entry)
+        loras.push(name);
+        
+        var row = $("<tr></tr>");
+        var data = $("<td></td>");
+        var span = $("<span>" + name + "</name>");
+        
+        data.append(span);
+        row.append(data);
+        lora_tbl.append(row);
+        
+        row.on("click", function () {
+          if(name == selected) {
+            if(span.hasClass("active")) {
+              span.removeClass("active lora");
+              promptRemove(new RegExp(",?\\s?<@?lora:" + name + "(:[^>]+)?>"));
+            } else {
+              span.addClass("active lora");
+              promptAdd("<lora:"+name+":1.0>");
+            }
+            selected = undefined;
+          } else {
+            selected = name;
+          }
+        });
+      })
+
+      embeddings = []
+      var embedding_tbl = $("#embedding-table").empty()
+      $.map(data.TI, function(entry) {
+        var name = getName(entry)
+        embeddings.push(name);
+
+        var row = $("<tr></tr>");
+        var data = $("<td></td>");
+        var span = $("<span>" + name + "</name>");
+        
+        data.append(span);
+        row.append(data);
+        embedding_tbl.append(row);
+
+        row.on("click", function () {
+          if(name == selected) {
+            if(span.hasClass("active")) {
+              span.removeClass("active embedding");
+              promptRemove(new RegExp(",?\\s?" + name));
+            } else {
+              span.addClass("active embedding");
+              promptAdd(name);
+            }
+            selected = undefined;
+          } else {
+            selected = name;
+          }
+        });
+      })
+
+      $('#prompt').highlightWithinTextarea('update');
+      $('#negative-prompt').highlightWithinTextarea('update');
+
+      upscalers = {"Lanczos":"Lanczos"}
+      $.map(data.SR, function(entry) {
+        var name = getName(entry);
+        upscalers[name] = entry;
+      })
+      await setUpscalers(Object.keys(upscalers));
+
+      if(data.device.length == 0 || (data.device.length == 1 && data.device[0] == "CPU")) {
+        showError("Error", "Backend has no GPU available.\n(Ran out of Colab GPU time for today?)");
+      }
+    }
+
+    async function handleDownload(data, id) {
+      if(!(id in downloads)) {
+        return
+      }
+      var entry = $("#"+id);
+      var name = entry.children("td").eq(0).children("div").eq(0);
+      var progress = entry.children("td").eq(1);
+      switch(data.status) {
+        case "started":
+          name.text(data.label);
+          break;
+        case "progress":
+          setProgress(progress, data.progress);
+          break;
+        case "success":
+          setProgress(progress, 1.0);
+          sendMessage({"type":"options"});
+          break;
+        case "error":
+          setProgress(progress, -1.0);
+          break;
+        default:
+          break;
+      }
+    }
+
+    function setResult(data) {
+      var blob = new Blob([data], {'type': 'image/png'});
+      var url = URL.createObjectURL(blob);
+      $("#result").attr("src", url);
+    }
+
+    async function handlePreview(data) {
+      var blob = new Blob([result.buffer], {'type': 'image/png'});
+      var url = URL.createObjectURL(blob);
+      $("#result").attr("src", url);
+    }
+
+    async function handleResult(data) {
+      var blob = new Blob([data], {'type': 'image/png'});
+      var url = URL.createObjectURL(blob);
+      $("#result").on("load", function (event) {
+        const i = $("#result");
+        i.off("load");
+        results.unshift({
+          src: i.attr("src"),
+          width: i.prop("naturalWidth"),
+          height: i.prop("naturalHeight")
+        });
+        if(gallery) {
+          gallery.options.dataSource = results;
+          var c = gallery.currSlide.index;
+          if(c != 0) {
+            gallery.refreshSlideContent(c+1);
+            gallery.goTo(c+1);
+          }
+          for (let x = 0; x < results.length; x++) {
+            gallery.refreshSlideContent(x);
+          }
+        }
+      })
+      $("#result").attr("src", url);
+    }
+
+    function doConnect() {
+      if(ws != undefined && ws.readyState != 3) {
+        ws.close()
+        return
+      }
+      try {
+        ws = new WebSocket($("#endpoint").val());
+      } catch(error) {
+        showError("Error", "Invalid Endpoint.");
+        return
+      }
+      var success = false;
+      return new Promise((resolve, reject) => {
+        ws.onopen = async function() {
+          key = undefined;
+          resolve();
+        };
+
+        ws.onerror = async function(event) {
+          glow("#connect", "glow-failed")
+          console.log(event)
+        }
+
+        ws.onclose = async function() {
+          switchConnected(false);
+          key = undefined;
+          reject();
+        };
+
+        ws.onmessage = async function(event) {
+          if(key == undefined) {
+            var password = $("#password").val();
+            if(!password) {
+              password = "qDiffusion";
+            }
+            key = await getKey(password);
+          }
+
+          if (event.data instanceof Blob) {
+            try {
+              const msg = await decrypt(key, await event.data.arrayBuffer());
+              if(!success) {
+                glow("#connect", "glow-success");
+                switchConnected(true);
+                success = true;
+              }
+              handleMessage(msg)
+            } catch(error) {
+              glow("#connect", "glow-failed");
+              showError("Error", "Incorrect password.");
+              ws.close()
+            }
+          }
+        };
+      });
+    }
+
+    async function doGenerate() {
+      if(ws == undefined || ws.readyState != 1) {
+        glow("#generate", "glow-failed")
+        return
+      }
+
+      if(Object.keys(models).length == 0) {
+        showError("Error", "No models found.");
+        return
+      }
+      
+      if(working) {
+        request = {
+          "type": "cancel",
+          "data": {
+            "id": id
+          }
+        }
+        await sendMessage(request);
+        return;
+      }
+
+      var seed = $("#seed").val()
+      if(seed == "") {
+        seed = "-1"
+      }
+      var model = models[$("#model option:selected").text()]
+
+      var request = {
+        "type": "txt2img",
+        "data": {
+          "width": parseInt($("#width").val()),
+          "height": parseInt($("#height").val()),
+          "steps": parseInt($("#steps").val()),
+          "scale": parseFloat($("#scale").val()),
+          "seed": parseInt(seed),
+          "sampler": $("#sampler option:selected").text(),
+          "prompt": [[[$("#prompt").val()], [$("#negative-prompt").val()]]],
+          "clip_skip": parseInt($("#clip-skip").val()),
+          "network_mode": $("#network-mode option:selected").text(),
+          "cfg_rescale": parseFloat($("#cfg-rescale").val()),
+          "prediction_type": $("#prediction option:selected").text(),
+          "unet": model,
+          "clip": model,
+          "vae": model,
+          "batch_size": 1,
+          "attention": "Default",
+          "vram_mode": "Default",
+          "preview_interval": 1,
+          "show_preview": "Medium",
+          "autocast": false,
+          "tiling_mode": "Disabled",
+        },
+        "id": Math.floor(Math.random() * 1000000) + 1
+      }
+
+      if(request["data"]["prediction_type"] == "Default") {
+        delete request["data"]["prediction_type"]
+      }
+
+      if(request["data"]["cfg_rescale"] == 0.0) {
+        delete request["data"]["cfg_rescale"]
+      }
+
+      var hr = parseFloat($("#highres").val())
+      if(hr > 1.0) {
+        request.data["hr_factor"] = hr;
+        request.data["hr_strength"] = parseFloat($("#strength").val());
+        request.data["hr_upscaler"] = upscalers[$("#upscaler option:selected").text()];
+      }
+
+      id = request.id;
+
+      switchWorking(true);
+      await sendMessage(request);
+    }
+
+    $("#connect").on("click", async function () { 
+      const urlParams = new URLSearchParams();
+      urlParams.set("endpoint", $("#endpoint").val());
+      urlParams.set("password", $("#password").val());
+      window.history.pushState({}, "qDiffusion Web", "/?"+urlParams.toString());
+      await doConnect(); 
+    });
+
+    $("#generate").on("click", async function () { await doGenerate(); });
+
+    $("#forever").on("click", async function () {
+      forever = !forever;
+      if(forever) {
+        $("#forever").addClass("btn-toggled");
+      } else {
+        $("#forever").removeClass("btn-toggled");
+      }
+    });
+
+    $("#download").on("click", async function () {
+      if(ws == undefined || ws.readyState != 1) {
+        glow("#download", "glow-failed")
+        return
+      }
+
+      const map = {"Checkpoint":"SD", "LoRA":"LoRA", "Embedding":"TI", "Upscaler":"SR"}
+      var type = map[$("#download-type option:selected").text()];
+      var url = $("#download-url").val();
+
+      var request = {
+        "type": "download",
+        "data": {
+          "type": type,
+          "url": url
+        },
+        "id": Math.floor(Math.random() * 1000000) + 1
+      }
+
+      await sendMessage(request);
+
+      var entry = $(`
+      <tr id="`+request.id+`">
+        <td><div class="td-text">`+url+`</div></td>
+        <td class="td-additional">
+          <svg class="download-icon" width="16" height="16" viewbox="-5 -5 110 110">
+            <path fill="none" stroke-linecap="butt" stroke-width="30" stroke="black" stroke-opacity="0.25" d="M50 10 a 40 40 0 0 1 0 80 a 40 40 0 0 1 0 -80"></path>
+            <path fill="none" stroke-linecap="butt" stroke-width="30" stroke="currentColor" stroke-dasharray="0,251.2" stroke-opacity="0.9" d="M50 10 a 40 40 0 0 1 0 80 a 40 40 0 0 1 0 -80"></path>
+          </svg>
+          <svg class="download-icon hidden" width="16" height="16" viewBox="2 2 20 20">
+            <path fill="currentColor" d="m9 20.42l-6.21-6.21l2.83-2.83L9 14.77l9.88-9.89l2.83 2.83L9 20.42Z"/>
+          </svg>
+          <svg class="download-icon hidden" width="16" height="16" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12.884 2.532c-.346-.654-1.422-.654-1.768 0l-9 17A.999.999 0 0 0 3 21h18a.998.998 0 0 0 .883-1.467L12.884 2.532zM13 18h-2v-2h2v2zm-2-4V9h2l.001 5H11z"/>
+          </svg>
+        </td>
+      </tr>
+      `);
+      $("#download-table").append(entry);
+      $("#download-holder").removeClass("hidden");
+      downloads[request.id] = {}
+    });
+
+    $("#error-modal").on("hidden.bs.modal", function (e) {
+      switchWorking(false);
+      if(ws == undefined || ws.readyState != 1) {
+        switchConnected(false)
+      } else {
+        switchConnected(true)
+      }
+    })
+
+    $("#result").on("click", function () {
+      if(results.length == 0) {
+        return;
+      }
+
+      const options =  {
+        dataSource: results,
+        index: 0,
+        loop: false,
+        spacing: 0.1,
+        zoom: false,
+        clickToCloseNonZoomable: false,
+        preload: [2, 2],
+        showHideAnimationType: 'none',
+      };
+      gallery = new PhotoSwipe(options);
+
+      gallery.on('uiRegister', function() {
+        gallery.ui.registerElement({
+          name: 'download-button',
+          order: 8,
+          isButton: true,
+          tagName: 'a',
+
+          html: {
+            isCustomSVG: true,
+            inner: '<path d="m22.595 14.46h-4v-6h-6v6h-4l7 7zm-14 9v2h14v-2z" id="pswp__icn-download"/>',
+            outlineID: 'pswp__icn-download'
+          },
+
+          onInit: (el, pswp) => {
+            el.setAttribute('download', '');
+            el.setAttribute('target', '_blank');
+            el.setAttribute('rel', 'noopener');
+
+            pswp.on('change', () => {
+              el.href = pswp.currSlide.data.src;
+            });
+          }
+        });
+      });
+
+      gallery.on('destroy', () => {
+        gallery = undefined
+      });
+
+      gallery.init();
+    });
+
+    function getLoRAs(prompt, full=false) {
+      var found = []
+      const lora_re = /<@?lora:([^:>]+)([^>]+)?>/g;
+      for (const match of prompt.matchAll(lora_re)) {
+        if(loras.includes(match[1])) {
+          if(full) {
+            found.push(match[0])
+          } else {
+            found.push(match[1])
+          }
+        }
+      }
+      return found;
+    }
+
+    function getEmbeddings(prompt) {
+      var found = []
+      for (var word of prompt.split(/,|\s+/)) {
+        if(embeddings.includes(word)) {
+          found.push(word)
+        }
+      }
+      return found
+    }
+
+    function highlightPrompt(input) {
+      var matches = []
+
+      const lora_re = /<@?lora:([^:>]+)([^>]+)?>/g;
+      for (const match of getLoRAs(input, true)) {
+        var name = match.split(/:|>/)[1]
+        if(loras.includes(name)) {
+          matches.push({ highlight: match, className: "lora" })
+        } else {
+          matches.push({ highlight: match, className: "error" })
+        }
+      }
+      
+      for (const match of getEmbeddings(input)) {
+        matches.push({ highlight: match, className: "embedding" })
+      }
+
+      return matches;
+    }
+
+    $("#prompt").highlightWithinTextarea({ highlight: highlightPrompt });
+    $("#negative-prompt").highlightWithinTextarea({ highlight: highlightPrompt });
+    switchPrompt(true);
+
+    $("#add-button").on("click", function () {
+      var p = getPrompt();
+      var loras = getLoRAs(p.val());
+      var embs = getEmbeddings(p.val());
+
+      $("#lora-table").children("tr").each(function () {
+        var span = $(this).children("td").eq(0).children("span").eq(0);
+        if(loras.includes(span.text())) {
+          span.addClass("active lora");
+        } else {
+          span.removeClass("active lora");
+        }
+      });
+
+      $("#embedding-table").children("tr").each(function () {
+        var span = $(this).children("td").eq(0).children("span").eq(0);
+        if(embs.includes(span.text())) {
+          span.addClass("active embedding");
+        } else {
+          span.removeClass("active embedding");
+        }
+      });
+
+      $("#add-button").addClass("disabled");
+      showAdd();
+    });
+
+    $("#add-modal").on("hidden.bs.modal", function (e) {     
+      $("#add-button").removeClass("disabled");
+    })
+
+    $(document).ready(function() {
+      const params = new URLSearchParams(window.location.search);
+      const endpoint = params.get("endpoint");
+      const password = params.get("password");
+      if(password) {
+        $("#password").val(password);
+      }
+      if(endpoint) {
+        $("#endpoint").val(endpoint);
+        doConnect();
+      }
+    });
+  </script>
+</html>
