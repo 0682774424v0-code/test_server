@@ -212,10 +212,10 @@ class SDGenerator {
 
     setupModelsTab() {
         // Load API keys from localStorage
-        const civitaiKey = localStorage.getItem('sd-civitai-key');
+        const civitaiToken = localStorage.getItem('sd-civitai-token');
         const huggingfaceToken = localStorage.getItem('sd-huggingface-token');
         
-        if (civitaiKey) document.getElementById('sd-civitai-key').value = civitaiKey;
+        if (civitaiToken) document.getElementById('sd-civitai-key').value = civitaiToken;
         if (huggingfaceToken) document.getElementById('sd-huggingface-token').value = huggingfaceToken;
 
         // Save API Keys button
@@ -223,7 +223,7 @@ class SDGenerator {
             const civitaiKey = document.getElementById('sd-civitai-key').value;
             const huggingfaceToken = document.getElementById('sd-huggingface-token').value;
             
-            localStorage.setItem('sd-civitai-key', civitaiKey);
+            localStorage.setItem('sd-civitai-token', civitaiKey);
             localStorage.setItem('sd-huggingface-token', huggingfaceToken);
             
             alert('✅ API Keys saved!');
@@ -601,13 +601,14 @@ class SDGenerator {
             return;
         }
 
-        // Server expects: { type: "download", data: { type: "...", url: "...", token: "..." } }
+        // Server expects: { type: "download", data: { type: "...", url: "...", civitai_token: "...", hf_token: "..." } }
         const payload = {
             type: 'download',
             data: {
                 type: modelType,  // 'checkpoint', 'lora', 'upscaler'
                 url: url,
-                token: localStorage.getItem('sd-huggingface-token') || ''
+                civitai_token: localStorage.getItem('sd-civitai-token') || '',
+                hf_token: localStorage.getItem('sd-huggingface-token') || ''
             }
         };
         
