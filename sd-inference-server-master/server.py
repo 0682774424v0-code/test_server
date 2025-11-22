@@ -17,6 +17,7 @@ import time
 import storage
 import wrapper
 import utils
+import download_manager
 
 import secrets
 from cryptography.hazmat.primitives import hashes
@@ -90,7 +91,8 @@ def convert_all_paths(j):
 def do_download(request, folder, id, callback):
     type = request["type"]
     url = request["url"]
-    token = None
+    civitai_token = request.get("civitai_token", None)
+    hf_token = request.get("hf_token", None)
     
     def started(callback, label, id):
         callback({"type":"download", "data":{"status": "started", "label": label}}, id)
@@ -104,88 +106,120 @@ def do_download(request, folder, id, callback):
     def error(callback, err, id, trace=""):
         callback({"type":"download", "data":{"status": "error", "message": err, "trace": trace}}, id)
 
-    def gdownload(callback, folder, url, id):
+    def progress_callback(progress_data):
+        """Handle progress updates from download manager"""
         try:
-            import gdown
-            parts = url.split("/")
-            g_id = None
-            if len(parts) == 4:
-                g_id = parts[3].split("=",1)[1].split("&",1)[0]
-            elif len(parts) == 7:
-                g_id = parts[5]
-            else:
-                raise Exception("Unknown URL format")
+            status = progress_data.get('status', '')
             
-            started(callback, url, id)
-            file = gdown.download(output=folder+os.path.sep, id=g_id+"&confirm=t")
-            success(callback, id, label=str(file).split(os.path.sep)[-1])
-        except Exception as e:
-            trace = log_traceback("DOWNLOAD")
-            error(callback, str(e), id, trace)
-
-    def megadownload(callback, folder, url, id):
-        try:
-            import mega
-            started(callback, url, id)
-            file = mega.Mega().login().download_url(url, folder)
-            success(callback, id, label=str(file).split(os.path.sep)[-1])
-        except Exception as e:
-            trace = log_traceback("DOWNLOAD")
-            error(callback, str(e), id, trace)
-
-    def requests_download(callback, folder, url, headers, id):
-        def progress_callback(progress):
-            if not progress["rate"]:
-                return
-
-            value = progress["n"] / progress["total"]
-            rate = (progress["rate"] or 1) / (1024*1024)
-            eta = (progress["total"] - progress["n"]) / (progress["rate"] or 1)
-
-            callback({"type":"download", "data":{"status": "progress", "progress": value, "rate": rate, "eta": eta}}, id)
-
-        def started_callback(path, response):
-            filename = path.rsplit(os.path.sep)[-1]
-            started(callback, filename, id)
+            # Metadata updates
+            if status == 'metadata':
+                info = progress_data.get('info', {})
+                callback({"type":"download", "data":{
+                    "status": "metadata",
+                    "base_model": info.get('base_model', ''),
+                    "trained_words": info.get('trained_words', '')
+                }}, id)
+            
+            # Progress updates
+            elif 'progress' in progress_data or 'downloaded' in progress_data:
+                progress = progress_data.get('progress', 0)
+                downloaded = progress_data.get('downloaded', 0)
+                total = progress_data.get('total', 0)
+                
+                # Convert to 0-1 range if needed
+                if isinstance(progress, str):
+                    try:
+                        progress = float(progress.replace('%', '')) / 100
+                    except:
+                        progress = 0
+                elif total > 0:
+                    progress = min(1.0, downloaded / total)
+                
+                # Calculate speed (MB/s)
+                rate_str = progress_data.get('speed', '0 KB/s')
+                try:
+                    if 'MB' in rate_str:
+                        rate = float(rate_str.replace('MB/s', ''))
+                    elif 'KB' in rate_str:
+                        rate = float(rate_str.replace('KB/s', '')) / 1024
+                    else:
+                        rate = 0
+                except:
+                    rate = 0
+                
+                # Calculate ETA in seconds
+                if downloaded > 0 and total > downloaded:
+                    bytes_per_sec = max(rate * 1024 * 1024, 1)
+                    eta = int((total - downloaded) / bytes_per_sec)
+                else:
+                    eta = 0
+                
+                callback({"type":"download", "data":{
+                    "status": "progress",
+                    "progress": min(1.0, progress),
+                    "rate": rate,
+                    "eta": eta,
+                    "downloaded": downloaded,
+                    "total": total
+                }}, id)
+            
+            # Error updates
+            elif status == 'error':
+                error(callback, progress_data.get('error', 'Unknown error'), id)
+            
+            # Info messages
+            elif status == 'info':
+                message = progress_data.get('message', '')
+                if message:
+                    callback({"type":"download", "data":{
+                        "status": "info",
+                        "message": message
+                    }}, id)
         
-        try:
-            utils.download(url, folder, progress_callback, started_callback, headers)
-            success(callback, id)
         except Exception as e:
-            trace = log_traceback("DOWNLOAD")
-            error(callback, str(e), id, trace)
+            print(f"[Server] Progress callback error: {e}")
+            error(callback, f"Progress tracking error: {e}", id)
 
     folder = os.path.join(folder, type)
 
     if not os.path.exists(folder):
         os.mkdir(folder)
     
-    if 'drive.google' in url:
-        thread = threading.Thread(target=gdownload, args=([callback, folder, url, id]))
-        thread.start()
-        return
-    
-    if 'mega.nz' in url:
-        thread = threading.Thread(target=megadownload, args=([callback, folder, url, id]))
-        thread.start()
-        return
-    
-    if 'civitai.com' in url:
-        if not "civitai.com/api/download/models" in url:
-            error(callback, "Unsupported URL", id)
-            return
-        token = request.get("civitai_token", None) 
-    
-    if 'huggingface' in url:
-        url = url.replace("/blob/", "/resolve/")
-        token = request.get("hf_token", None)
+    def execute_download():
+        try:
+            # Get the base models folder (parent of current type folder)
+            # folder is like: /path/to/models/checkpoint
+            # base_folder should be: /path/to/models
+            base_folder = os.path.dirname(folder)
+            
+            print(f"[SERVER] Download started:")
+            print(f"  URL: {url[:60]}...")
+            print(f"  Type: {type}")
+            print(f"  Folder: {folder}")
+            print(f"  Base folder: {base_folder}")
+            
+            filename = download_manager.download_model(
+                url=url,
+                model_type=type,
+                folder=base_folder,  # Pass parent folder, download_model will add type subfolder
+                progress_callback=progress_callback,
+                civitai_token=civitai_token,
+                hf_token=hf_token
+            )
+            
+            print(f"[SERVER] Download completed: {filename}")
+            
+            if filename:
+                label = os.path.basename(filename)
+                success(callback, id, label=label)
+            else:
+                error(callback, "Download failed", id)
+        except Exception as e:
+            trace = log_traceback("DOWNLOAD")
+            print(f"[SERVER] Download error: {e}")
+            error(callback, str(e), id, trace)
 
-    headers = {}
-    if token:
-        print(token)
-        headers = {"Authorization": f"Bearer {token}"}
-    
-    thread = threading.Thread(target=requests_download, args=([callback, folder, url, headers, id]))
+    thread = threading.Thread(target=execute_download)
     thread.start()
 
 class Inference(threading.Thread):
